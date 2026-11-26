@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAT Question Deck — Free Practice Questions &amp; Missed-Question Flashcards</title>
+<meta name="description" content="Free original SAT practice questions organized by the eight official domains. Every question you miss is saved to your personal flashcard deck — stored only in your browser. By Ryan Krug, Math with Ryan.">
+<style>
+/* Design system carried over from the SAT Vocabulary Flashcards site
+   (same colors, type, cards, and tap-to-reveal interaction) so students
+   moving between the two sites see one consistent product. */
+:root{
+  --ink:#1c2430; --muted:#5b6572; --line:#d9dee6; --bg:#f4f6f9; --card:#ffffff;
+  --accent:#1f3864; --hdr:132px;
+  --m1:#1F3864; --m2:#0F766E; --m3:#7030A0; --m4:#B45309;
+  --r1:#1F3864; --r2:#0F766E; --r3:#7030A0; --r4:#B45309;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:auto}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--ink);-webkit-text-size-adjust:100%}
+header{position:sticky;top:0;z-index:50;background:var(--accent);color:#fff;
+  padding:10px 14px 8px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+header h1{margin:0;font-size:20px;line-height:1.2}
+header p{margin:2px 0 8px;font-size:13px;opacity:.85}
+.controls{display:flex;flex-direction:column;gap:8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid rgba(255,255,255,.55);background:transparent;color:#fff;border-radius:999px;
+  padding:5px 12px;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{background:#fff;color:var(--accent);font-weight:700}
+main{max-width:880px;margin:0 auto;padding:14px 12px 60px}
+.intro{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
+.intro b{color:var(--accent)}
+h2.level-title{margin:26px 0 4px;font-size:19px;color:#fff;padding:8px 12px;border-radius:8px}
+.math-title{background:var(--m1)} .rw-title{background:var(--r1)}
+.level-sub{margin:0 2px 10px;font-size:13px;color:var(--muted)}
+.domain{background:var(--card);border:1px solid var(--line);border-left:6px solid var(--accent);
+  border-radius:10px;margin:10px 0;overflow:hidden}
+.domain-head{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;
+  background:none;border:0;padding:13px 14px;cursor:pointer;text-align:left;font:inherit}
+.domain-head .t{font-weight:700;font-size:16px}
+.domain-head .m{display:block;font-weight:400;font-size:12.5px;color:var(--muted);margin-top:2px}
+.domain-head .go{font-size:13px;font-weight:700;color:var(--accent);white-space:nowrap}
+.wide-actions{display:grid;grid-template-columns:1fr;gap:10px;margin:14px 0}
+@media(min-width:640px){.wide-actions{grid-template-columns:1fr 1fr 1fr}}
+.action-btn{padding:13px;border:1px solid var(--line);border-radius:10px;background:var(--card);
+  font:inherit;font-weight:700;font-size:15px;color:var(--accent);cursor:pointer}
+.action-btn small{display:block;font-weight:400;font-size:12.5px;color:var(--muted);margin-top:2px}
+/* ---------- practice ---------- */
+.practice-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 14px}
+.meta{font-size:12.5px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.meta .lvl{text-transform:none;letter-spacing:0}
+.stimulus{background:#fbfcfe;border:1px solid var(--line);border-left:6px solid #9db2d5;border-radius:8px;
+  padding:10px 12px;font-size:15px;line-height:1.55;margin-bottom:12px;white-space:pre-wrap}
+.qtext{font-size:16.5px;line-height:1.55;margin:0 0 14px;white-space:pre-wrap}
+.choices{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.choice-btn{width:100%;text-align:left;font:inherit;font-size:15px;line-height:1.45;padding:11px 12px;
+  border:1px solid var(--line);border-radius:10px;background:#fbfcfe;cursor:pointer}
+.choice-btn .letter{font-weight:700;color:var(--accent);margin-right:8px}
+.choice-btn:disabled{cursor:default;opacity:.85}
+.choice-btn.correct{background:#eef4ea;border-color:#7ba05b;font-weight:600;opacity:1}
+.choice-btn.wrong{background:#fbeaea;border-color:#c66;font-weight:600;opacity:1}
+.grid-row{display:flex;gap:8px;flex-wrap:wrap}
+.grid-input{flex:1;min-width:160px;padding:11px 12px;font-size:16px;border:1px solid var(--line);border-radius:10px;font:inherit}
+.check-btn,.next-btn,.deck-btn{padding:11px 18px;border:0;border-radius:10px;background:var(--accent);
+  color:#fff;font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+.feedback{display:none;margin-top:12px;padding:10px 12px;border-radius:8px;font-size:15px;line-height:1.5}
+.feedback.show{display:block}
+.feedback.good{background:#eef4ea;border:1px solid #cfe0c3}
+.feedback.bad{background:#fbeaea;border:1px solid #e3b3b3}
+.solution{display:none;margin-top:9px;padding:9px 10px;background:#eef4ea;border:1px solid #cfe0c3;
+  border-radius:8px;font-size:14.5px;line-height:1.55;white-space:pre-wrap}
+.solution.show{display:block}
+.solution .ans-line{font-weight:700;display:block;margin-bottom:4px}
+.deck-note{font-size:13.5px;color:var(--accent);font-weight:600;margin-top:8px}
+.practice-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+.progress{font-size:13.5px;color:var(--muted)}
+.link-btn{background:none;border:0;color:var(--accent);font:inherit;font-size:14px;font-weight:600;cursor:pointer;padding:6px}
+/* ---------- deck review (vocab flashcard component) ---------- */
+.card{border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:#fbfcfe}
+.card .w{font-size:17px;font-weight:700;line-height:1.4}
+.card .pos{font-style:italic;color:var(--muted);font-weight:400;font-size:13px;margin-left:6px}
+.card .ex{font-size:14.5px;line-height:1.55;white-space:pre-wrap}
+.card .def{display:none;margin-top:9px;padding:9px 10px;background:#eef4ea;border:1px solid #cfe0c3;
+  border-radius:8px;font-size:14.5px;line-height:1.55;white-space:pre-wrap}
+.card.revealed .def{display:block}
+.reveal-btn{margin-top:9px;width:100%;padding:9px;border:1px dashed #9db2d5;border-radius:8px;
+  background:#eef2fa;color:var(--accent);font-size:14px;font-weight:600;cursor:pointer}
+.card.revealed .reveal-btn{display:none}
+.deck-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.deck-controls .spacer{flex:1}
+.ctl-btn{padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);
+  font:inherit;font-size:14px;font-weight:600;color:var(--accent);cursor:pointer}
+.ctl-btn.danger{color:#a33;border-color:#e3b3b3}
+.deck-count{font-size:13.5px;color:var(--muted)}
+/* ---------- browse the bank ---------- */
+.browse-domain{font-size:16.5px;color:var(--accent);margin:20px 2px 4px}
+.browse-item{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0}
+.browse-item .meta{margin-bottom:6px}
+.browse-q{font-size:15.5px;line-height:1.55;margin:0 0 8px;white-space:pre-wrap}
+.browse-stimulus{background:#fbfcfe;border:1px solid var(--line);border-left:6px solid #9db2d5;border-radius:8px;
+  padding:8px 10px;font-size:14px;line-height:1.5;margin-bottom:8px;white-space:pre-wrap}
+.browse-choices{margin:0 0 4px;padding-left:22px;font-size:14.5px;line-height:1.5;color:var(--muted)}
+.add-bank-btn{padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);
+  font:inherit;font-size:14px;font-weight:600;color:var(--accent);cursor:pointer;margin-top:8px}
+.add-bank-btn:disabled{opacity:.55;cursor:default}
+.add-current-btn{padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);
+  font:inherit;font-size:14px;font-weight:600;color:var(--accent);cursor:pointer}
+.add-current-btn:disabled{opacity:.55;cursor:default}
+/* ---------- add-your-own form ---------- */
+.form-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 14px}
+.form-card label{display:block;font-weight:700;font-size:14px;margin:14px 0 5px}
+.form-card label:first-child{margin-top:0}
+.form-card textarea,.form-card input,.form-card select{width:100%;padding:10px 12px;font:inherit;font-size:15px;
+  border:1px solid var(--line);border-radius:8px;background:#fbfcfe}
+.form-card textarea{min-height:84px;resize:vertical}
+.form-note{font-size:13px;color:var(--muted);margin-top:4px}
+.form-ok{display:none;margin-top:12px;padding:10px 12px;background:#eef4ea;border:1px solid #cfe0c3;border-radius:8px;font-size:14.5px}
+.form-ok.show{display:block}
+#status{font-size:13.5px;color:var(--muted);margin:10px 2px;min-height:18px}
+.hidden{display:none !important}
+footer{max-width:880px;margin:0 auto;padding:0 12px 40px;font-size:13px;color:var(--muted);line-height:1.6}
+footer a{color:var(--accent)}
+#print-area{display:none}
+@media print{
+  header,main,footer{display:none !important}
+  #print-area{display:block;font-family:Georgia,serif;color:#000;padding:10px}
+  #print-area h1{font-size:20px}
+  .print-card{border:1px solid #999;border-radius:6px;padding:12px 14px;margin:0 0 14px;page-break-inside:avoid}
+  .print-card .pm{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#444}
+  .print-card .pq{font-size:14.5px;line-height:1.5;white-space:pre-wrap;margin:6px 0}
+  .print-card .pa{font-size:14px;margin-top:8px}
+  .print-card .ps{font-size:13.5px;line-height:1.5;white-space:pre-wrap;margin-top:4px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>SAT Question Deck</h1>
+  <p>Free original practice questions — every miss becomes a flashcard in your personal deck.</p>
+  <div class="controls">
+    <div class="chips" role="navigation" aria-label="Views">
+      <button class="chip" id="chip-practice" aria-pressed="true" type="button">Practice</button>
+      <button class="chip" id="chip-browse" aria-pressed="false" type="button">Browse Questions</button>
+      <button class="chip" id="chip-deck" aria-pressed="false" type="button">My Deck (<span id="deck-count">0</span>)</button>
+      <button class="chip" id="chip-add" aria-pressed="false" type="button">Add a Card</button>
+    </div>
+  </div>
+</header>
+<main>
+  <!-- HOME / PRACTICE SETUP -->
+  <section id="view-home">
+    <div class="intro">
+      <b>How it works:</b> pick a domain below and answer questions one at a time, with the
+      full worked solution shown after each answer. Any question you miss is
+      <b>automatically saved to your personal flashcard deck</b> — stored only in this
+      browser, on this device. Nothing is uploaded, ever. Review the deck, pick extra
+      questions to study under <b>Browse Questions</b>, add questions you missed
+      anywhere else, and print the deck whenever you want.
+    </div>
+    <div class="wide-actions">
+      <button class="action-btn" data-start="math" type="button">All Math<small>50 questions · 4 domains</small></button>
+      <button class="action-btn" data-start="rw" type="button">All Reading &amp; Writing<small>50 questions · 4 domains</small></button>
+      <button class="action-btn" data-start="all" type="button">Mixed Practice<small>All 100 questions, shuffled</small></button>
+    </div>
+    <div id="domain-list"></div>
+    <p id="status"></p>
+  </section>
+
+  <!-- PRACTICE -->
+  <section id="view-practice" class="hidden">
+    <div class="practice-card" id="practice-card"></div>
+  </section>
+
+  <!-- BROWSE THE BANK -->
+  <section id="view-browse" class="hidden">
+    <div class="intro">
+      <b>Browse all 100 questions</b>, organized by the eight official domains.
+      See a question you want to study — or one you know you'd miss? Tap
+      <b>Add to my deck</b> and it joins your personal flashcard deck, exactly like
+      a question you missed in practice.
+    </div>
+    <div id="browse-list"></div>
+  </section>
+
+  <!-- DECK REVIEW -->
+  <section id="view-deck" class="hidden">
+    <div id="deck-empty" class="intro hidden">
+      <b>Your deck is empty.</b> Questions you miss in practice land here automatically.
+      You can also pick questions yourself under <b>Browse Questions</b>, or add a
+      question you missed somewhere else from the <b>Add a Card</b> tab.
+    </div>
+    <div id="deck-main">
+      <article class="card" id="deck-card"></article>
+      <div class="deck-controls">
+        <button class="ctl-btn" id="deck-prev" type="button">← Prev</button>
+        <span class="deck-count" id="deck-pos"></span>
+        <button class="ctl-btn" id="deck-next" type="button">Next →</button>
+        <button class="ctl-btn" id="deck-shuffle" type="button">Shuffle</button>
+        <span class="spacer"></span>
+        <button class="ctl-btn" id="deck-print" type="button">Print deck</button>
+      </div>
+      <div class="deck-controls">
+        <button class="ctl-btn danger" id="deck-remove" type="button">Remove this card</button>
+        <button class="ctl-btn danger" id="deck-clear" type="button">Clear whole deck</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ADD YOUR OWN -->
+  <section id="view-add" class="hidden">
+    <div class="form-card">
+      <form id="add-form">
+        <label for="f-question">A question you missed</label>
+        <textarea id="f-question" required placeholder="Type or paste the question here…"></textarea>
+        <label for="f-answer">The correct answer</label>
+        <input id="f-answer" required placeholder="e.g., C, or 42, or the correct sentence">
+        <label for="f-solution">Why that's the answer (your solution note)</label>
+        <textarea id="f-solution" placeholder="A sentence or two so future-you remembers the trick…"></textarea>
+        <label for="f-topic">Domain (optional)</label>
+        <select id="f-topic">
+          <option value="">Not sure / other</option>
+        </select>
+        <p class="form-note">The card is saved to your deck in this browser only.</p>
+        <div style="margin-top:14px"><button class="check-btn" type="submit">Add to my deck</button></div>
+        <div class="form-ok" id="add-ok">Added! Find it under <b>My Deck</b>.</div>
+      </form>
+    </div>
+  </section>
+</main>
+<footer>
+  <p><b>Math with Ryan</b> — free SAT practice by Ryan Krug, SAT prep instructor in Tampa, FL.</p>
+  <p>Get the books: <a href="https://classful.com/ryan-krug/">Classful</a> · <a href="https://mathwithryan.gumroad.com">Gumroad</a></p>
+  <p>Want tutoring? Call or text <a href="tel:+12015722110">(201) 572-2110</a> · <a href="mailto:ryantkrug@gmail.com">ryantkrug@gmail.com</a></p>
+  <p>All questions on this site are original. SAT is a registered trademark of the College Board, which does not endorse this product.</p>
+</footer>
+<div id="print-area"></div>
+<script src="questions.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

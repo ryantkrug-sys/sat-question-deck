@@ -107,6 +107,18 @@ h2.level-title{margin:26px 0 4px;font-size:19px;color:#fff;padding:8px 12px;bord
 .add-current-btn{padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);
   font:inherit;font-size:14px;font-weight:600;color:var(--accent);cursor:pointer}
 .add-current-btn:disabled{opacity:.55;cursor:default}
+/* ---------- printed-deck ordering ---------- */
+#deck-order:disabled{opacity:.55;cursor:default}
+.order-code-row{display:flex;gap:8px;align-items:stretch}
+.order-code-row input{flex:1;min-width:0;padding:10px 12px;font:inherit;font-size:13.5px;
+  border:1px solid var(--line);border-radius:8px;background:#fbfcfe}
+.order-checkout{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.order-link{padding:11px 16px;border-radius:10px;background:var(--accent);color:#fff;
+  font-size:14.5px;font-weight:700;text-decoration:none}
+.order-link.disabled{background:var(--card);color:var(--muted);border:1px solid var(--line)}
+.order-pick{display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);
+  border-radius:8px;margin:6px 0;background:#fbfcfe;font-size:14px;line-height:1.45;cursor:pointer}
+.order-pick input{margin-top:3px}
 /* ---------- add-your-own form ---------- */
 .form-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 14px}
 .form-card label{display:block;font-weight:700;font-size:14px;margin:14px 0 5px}
@@ -160,8 +172,8 @@ footer a{color:var(--accent)}
     </div>
     <div class="wide-actions">
       <button class="action-btn" data-start="math" type="button">All Math<small>408 questions · 4 domains</small></button>
-      <button class="action-btn" data-start="rw" type="button">All Reading &amp; Writing<small>50 questions · 4 domains</small></button>
-      <button class="action-btn" data-start="all" type="button">Mixed Practice<small>All 458 questions, shuffled</small></button>
+      <button class="action-btn" data-start="rw" type="button">All Reading &amp; Writing<small>408 questions · 4 domains</small></button>
+      <button class="action-btn" data-start="all" type="button">Mixed Practice<small>All 816 questions, shuffled</small></button>
     </div>
     <div id="domain-list"></div>
     <p id="status"></p>
@@ -175,7 +187,7 @@ footer a{color:var(--accent)}
   <!-- BROWSE THE BANK -->
   <section id="view-browse" class="hidden">
     <div class="intro">
-      <b>Browse all 458 questions</b>, organized by the eight official domains.
+      <b>Browse all 816 questions</b>, organized by the eight official domains.
       See a question you want to study — or one you know you'd miss? Tap
       <b>Add to my deck</b> and it joins your personal flashcard deck, exactly like
       a question you missed in practice.
@@ -199,12 +211,15 @@ footer a{color:var(--accent)}
         <button class="ctl-btn" id="deck-shuffle" type="button">Shuffle</button>
         <span class="spacer"></span>
         <button class="ctl-btn" id="deck-print" type="button">Print deck</button>
+        <button class="ctl-btn" id="deck-order" type="button">Order this deck printed</button>
+        <span class="deck-count" id="order-hint"></span>
       </div>
       <div class="deck-controls">
         <button class="ctl-btn danger" id="deck-remove" type="button">Remove this card</button>
         <button class="ctl-btn danger" id="deck-clear" type="button">Clear whole deck</button>
       </div>
     </div>
+    <div id="order-panel" class="form-card hidden" style="margin-top:14px"></div>
   </section>
 
   <!-- ADD YOUR OWN -->

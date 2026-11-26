@@ -83,6 +83,70 @@ function resolveDeck(store) {
   return loadDeck(store).map(resolveCard).filter(function (c) { return c !== null; });
 }
 
+/* ---------------- printed-deck ordering ---------------- */
+/* Checkout links for the printed-deck product — the ONE place they live.
+   Filled in when the Gumroad printed-deck product and the four Stripe
+   Payment Links (one per tier) are created. While a link is an empty
+   string, that checkout button renders disabled, labeled "coming soon",
+   instead of linking nowhere. */
+var ORDER_LINKS = {
+  gumroad: "",
+  stripe: { 36: "", 54: "", 72: "", 108: "" }
+};
+var ORDER_TIERS = [
+  { max: 36, price: 29.99 },
+  { max: 54, price: 34.99 },
+  { max: 72, price: 39.99 },
+  { max: 108, price: 49.99 }
+];
+var ORDER_MAX_CARDS = 108;
+function tierForCount(n) {
+  if (!n || n < 1) return null;
+  for (var i = 0; i < ORDER_TIERS.length; i++) {
+    if (n <= ORDER_TIERS[i].max) return ORDER_TIERS[i];
+  }
+  return null; // more cards than the largest printed deck
+}
+function priceForCount(n) {
+  var t = tierForCount(n);
+  return t ? t.price : null;
+}
+/* Bank-question ids from deck entries, in deck order. Custom typed cards
+   are digital-only in v1, so they never appear here. */
+function printableIds(entries) {
+  return entries.filter(function (e) { return e.kind === "bank"; })
+    .map(function (e) { return e.id; });
+}
+/* Deck code: "SQD1-" + the bank index of each question (base36, dot-joined),
+   in deck order. The student pastes it into the checkout's deck-code field
+   so the exact deck can be rebuilt for printing. */
+var DECK_CODE_PREFIX = "SQD1-";
+function encodeDeckCode(ids) {
+  var index = {};
+  QUESTION_BANK.forEach(function (q, i) { index[q.id] = i; });
+  var parts = [];
+  for (var i = 0; i < ids.length; i++) {
+    if (!(ids[i] in index)) return null;
+    parts.push(index[ids[i]].toString(36));
+  }
+  return DECK_CODE_PREFIX + parts.join(".");
+}
+function decodeDeckCode(code) {
+  if (typeof code !== "string") return null;
+  var s = code.trim();
+  if (s.indexOf(DECK_CODE_PREFIX) !== 0) return null;
+  var body = s.slice(DECK_CODE_PREFIX.length);
+  if (!body) return null;
+  var parts = body.split("."), ids = [];
+  for (var i = 0; i < parts.length; i++) {
+    if (!/^[0-9a-z]+$/.test(parts[i])) return null;
+    var n = parseInt(parts[i], 36);
+    if (isNaN(n) || n < 0 || n >= QUESTION_BANK.length) return null;
+    ids.push(QUESTION_BANK[n].id);
+  }
+  return ids;
+}
+
 /* ---------------- browser app ---------------- */
 var SQD = { state: null };
 function esc(s) {
@@ -336,6 +400,8 @@ function init() {
     var empty = cards.length === 0;
     el("deck-empty").classList.toggle("hidden", !empty);
     el("deck-main").classList.toggle("hidden", empty);
+    updateOrderUI();
+    if (!el("order-panel").classList.contains("hidden")) renderOrderPanel();
     if (empty) return;
     if (deckPos >= cards.length) deckPos = cards.length - 1;
     if (deckPos < 0) deckPos = 0;
@@ -416,6 +482,137 @@ function init() {
   SQD.buildPrintArea = buildPrintArea;
   SQD.renderDeck = renderDeck;
 
+  /* ----- printed-deck ordering (UI) ----- */
+  var orderSelection = null; // null = default picks (first ORDER_MAX_CARDS bank cards)
+  function orderInfo() {
+    var entries = loadDeck(store);
+    var bankIds = printableIds(entries);
+    var selected;
+    if (orderSelection) {
+      selected = bankIds.filter(function (id) { return orderSelection.indexOf(id) >= 0; });
+    } else {
+      selected = bankIds.slice(0, ORDER_MAX_CARDS);
+    }
+    return { bankIds: bankIds, customCount: entries.length - bankIds.length, selected: selected };
+  }
+  function updateOrderUI() {
+    var btn = el("deck-order"), hint = el("order-hint");
+    var info = orderInfo();
+    if (info.bankIds.length === 0) {
+      btn.disabled = true;
+      btn.textContent = "Order this deck printed";
+      hint.textContent = loadDeck(store).length === 0
+        ? "Add cards to your deck first — then you can order it printed."
+        : "Printed decks use bank questions only — add a bank question to order a printed deck.";
+      return;
+    }
+    btn.disabled = false;
+    var n = info.selected.length;
+    btn.textContent = "Order this deck printed — " + n + " card" + (n === 1 ? "" : "s") +
+      " · $" + priceForCount(n).toFixed(2);
+    hint.textContent = info.bankIds.length > ORDER_MAX_CARDS
+      ? "Printed decks hold up to " + ORDER_MAX_CARDS + " cards — you pick which ones in the order panel."
+      : "";
+  }
+  function checkoutHTML(name, detail, url) {
+    if (url) {
+      return '<a class="order-link" href="' + esc(url) + '" target="_blank" rel="noopener">Checkout with ' +
+        name + ' <span style="font-weight:400">(' + detail + ")</span></a>";
+    }
+    return '<span class="order-link disabled" aria-disabled="true">' + name + " checkout — coming soon</span>";
+  }
+  function refreshOrderBits() {
+    var info = orderInfo();
+    var n = info.selected.length;
+    var tier = tierForCount(n);
+    el("order-summary").textContent = n + " card" + (n === 1 ? "" : "s") + " · $" +
+      (tier ? tier.price.toFixed(2) : "—") + " (shipping included). Delivery takes about 2 weeks.";
+    el("order-code").value = n ? (encodeDeckCode(info.selected) || "") : "";
+    el("order-checkout").innerHTML = tier
+      ? checkoutHTML("Gumroad", "cards & PayPal", ORDER_LINKS.gumroad) +
+        checkoutHTML("Stripe", "cards, Apple Pay, Google Pay & Link", ORDER_LINKS.stripe[tier.max])
+      : "";
+    var pc = el("order-pick-count");
+    if (pc) pc.textContent = "Selected " + n + " of up to " + ORDER_MAX_CARDS + " cards.";
+  }
+  function renderOrderPanel() {
+    var panel = el("order-panel");
+    var info = orderInfo();
+    var html = '<h3 style="margin:0 0 8px;font-size:16.5px;color:var(--accent)">Order this deck printed</h3>' +
+      '<p style="font-size:14.5px;line-height:1.55;margin:0 0 8px">Turn this deck into a real, ' +
+      "physical set of flashcards — printed and shipped to you. <b>Printed decks include bank " +
+      "questions only.</b></p>";
+    if (info.customCount > 0) {
+      html += '<p style="font-size:14.5px;line-height:1.55;margin:0 0 8px">' + info.customCount +
+        " of the cards in your deck are ones you typed yourself. Those stay in your digital deck " +
+        "only — they can't be printed, so they're not part of this order or the deck code below.</p>";
+    }
+    if (info.bankIds.length > ORDER_MAX_CARDS) {
+      html += '<p style="font-size:14.5px;line-height:1.55;margin:0 0 4px">Your deck has ' +
+        info.bankIds.length + " bank questions, but a printed deck holds up to " + ORDER_MAX_CARDS +
+        ". The first " + ORDER_MAX_CARDS + " are picked — change the picks here:</p>" +
+        '<p class="deck-count" id="order-pick-count" style="margin:0 0 6px"></p><div>';
+      info.bankIds.forEach(function (id) {
+        var q = bankById(id);
+        var checked = info.selected.indexOf(id) >= 0 ? " checked" : "";
+        html += '<label class="order-pick"><input type="checkbox" data-pick="' + esc(id) + '"' + checked + ">" +
+          "<span><b>" + esc(q.domain) + " · " + esc(q.topic) + "</b><br>" +
+          esc(q.question.length > 110 ? q.question.slice(0, 110) + "…" : q.question) + "</span></label>";
+      });
+      html += "</div>";
+    }
+    html += '<p id="order-summary" style="font-size:14.5px;font-weight:600;margin:10px 0 0"></p>' +
+      '<label for="order-code" style="display:block;font-weight:700;font-size:14px;margin:14px 0 5px">Your deck code</label>' +
+      '<p class="form-note" style="margin:0 0 6px">Copy this code and paste it into the deck-code field ' +
+      "at checkout — that's how we know exactly which questions to print.</p>" +
+      '<div class="order-code-row"><input id="order-code" readonly value="">' +
+      '<button class="ctl-btn" id="order-copy" type="button">Copy</button></div>' +
+      '<p class="form-note" id="order-copy-msg" style="min-height:16px"></p>' +
+      '<p style="font-size:14.5px;margin:8px 0 0">Have a code from Ryan? Enter it at checkout.</p>' +
+      '<div class="order-checkout" id="order-checkout"></div>';
+    panel.innerHTML = html;
+    refreshOrderBits();
+    el("order-copy").addEventListener("click", function () {
+      var input = el("order-code");
+      input.select();
+      function done() { el("order-copy-msg").textContent = "Copied — paste it into the deck-code field at checkout."; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(input.value).then(done, function () { done(); });
+      } else {
+        if (document.execCommand) document.execCommand("copy");
+        done();
+      }
+    });
+    Array.prototype.forEach.call(panel.querySelectorAll("[data-pick]"), function (box) {
+      box.addEventListener("change", function () {
+        var id = box.getAttribute("data-pick");
+        var sel = orderInfo().selected.slice();
+        if (box.checked) {
+          if (sel.length >= ORDER_MAX_CARDS) {
+            box.checked = false;
+            el("order-pick-count").textContent = "That's the " + ORDER_MAX_CARDS +
+              "-card max — uncheck one before adding another.";
+            return;
+          }
+          sel.push(id);
+        } else {
+          sel = sel.filter(function (x) { return x !== id; });
+        }
+        orderSelection = sel;
+        refreshOrderBits();
+        updateOrderUI();
+      });
+    });
+  }
+  el("deck-order").addEventListener("click", function () {
+    var panel = el("order-panel");
+    var opening = panel.classList.contains("hidden");
+    panel.classList.toggle("hidden", !opening);
+    if (opening) renderOrderPanel();
+  });
+  SQD.updateOrderUI = updateOrderUI;
+  SQD.renderOrderPanel = renderOrderPanel;
+
   /* ----- add your own ----- */
   var topicSel = el("f-topic");
   Object.keys(SECTION_DOMAINS).forEach(function (section) {
@@ -451,6 +648,7 @@ function init() {
 
   renderHome();
   updateDeckCount();
+  updateOrderUI();
   SQD.show = show;
   SQD.store = store;
 
@@ -463,7 +661,7 @@ function runSelfTest() {
   function check(name, cond) { out.push((cond ? "PASS" : "FAIL") + " " + name); }
   function $(id) { return document.getElementById(id); }
   try {
-    check("bank has 458 questions", QUESTION_BANK.length === 458);
+    check("bank has 816 questions", QUESTION_BANK.length === 816);
     var domains = {};
     QUESTION_BANK.forEach(function (q) { domains[q.domain] = true; });
     check("bank spans 8 domains", Object.keys(domains).length === 8);
@@ -487,10 +685,33 @@ function runSelfTest() {
     geometry.forEach(function (q) { geoLevels[q.level]++; });
     check("Geometry and Trigonometry has 102 questions, 34 per level",
       geometry.length === 102 && geoLevels[1] === 34 && geoLevels[2] === 34 && geoLevels[3] === 34);
+    var sec = QUESTION_BANK.filter(function (q) { return q.domain === "Standard English Conventions"; });
+    var secLevels = { 1: 0, 2: 0, 3: 0 };
+    sec.forEach(function (q) { secLevels[q.level]++; });
+    check("Standard English Conventions has 102 questions, 34 per level",
+      sec.length === 102 && secLevels[1] === 34 && secLevels[2] === 34 && secLevels[3] === 34);
+    var inf = QUESTION_BANK.filter(function (q) { return q.domain === "Information and Ideas"; });
+    var infLevels = { 1: 0, 2: 0, 3: 0 };
+    inf.forEach(function (q) { infLevels[q.level]++; });
+    check("Information and Ideas has 102 questions, 34 per level",
+      inf.length === 102 && infLevels[1] === 34 && infLevels[2] === 34 && infLevels[3] === 34);
+    var cft = QUESTION_BANK.filter(function (q) { return q.domain === "Craft and Structure"; });
+    var cftLevels = { 1: 0, 2: 0, 3: 0 };
+    cft.forEach(function (q) { cftLevels[q.level]++; });
+    check("Craft and Structure has 102 questions, 34 per level",
+      cft.length === 102 && cftLevels[1] === 34 && cftLevels[2] === 34 && cftLevels[3] === 34);
+    var eoi = QUESTION_BANK.filter(function (q) { return q.domain === "Expression of Ideas"; });
+    var eoiLevels = { 1: 0, 2: 0, 3: 0 };
+    eoi.forEach(function (q) { eoiLevels[q.level]++; });
+    check("Expression of Ideas has 102 questions, 34 per level",
+      eoi.length === 102 && eoiLevels[1] === 34 && eoiLevels[2] === 34 && eoiLevels[3] === 34);
     var seenIds = {}, dupId = false;
     QUESTION_BANK.forEach(function (q) { if (seenIds[q.id]) dupId = true; seenIds[q.id] = true; });
     check("no duplicate question ids", !dupId);
     check("deck starts empty", loadDeck(SQD.store).length === 0);
+    check("order button disabled while deck is empty", $("deck-order").disabled === true);
+    check("order hint tells an empty deck to add cards first",
+      $("order-hint").textContent.indexOf("Add cards") === 0);
 
     // practice: deliberately miss question 1
     SQD.startPractice({ domain: "Algebra" });
@@ -545,7 +766,7 @@ function runSelfTest() {
     // browse: add a bank question straight from the bank list
     SQD.show("browse");
     var addBtns = document.querySelectorAll("[data-add]");
-    check("browse lists all 458 bank questions", addBtns.length === 458);
+    check("browse lists all 816 bank questions", addBtns.length === 816);
     var beforeBrowse = loadDeck(SQD.store).length;
     var targetBtn = null, targetId = null;
     Array.prototype.forEach.call(addBtns, function (b) {
@@ -566,6 +787,30 @@ function runSelfTest() {
     check("print includes the browse-added card", nPrint === beforeBrowse + 1 &&
       $("print-area").querySelectorAll(".print-card").length === beforeBrowse + 1);
 
+    // printed-deck order flow: button + panel with bank cards in the deck
+    SQD.show("deck");
+    check("order button enabled with bank cards in deck", $("deck-order").disabled === false);
+    check("order button shows live count and tier price",
+      /\d+ cards? · \$\d+\.\d{2}/.test($("deck-order").textContent));
+    $("deck-order").click();
+    check("order panel opens", !$("order-panel").classList.contains("hidden"));
+    var orderCode = $("order-code").value;
+    check("deck code generated in panel", orderCode.indexOf(DECK_CODE_PREFIX) === 0);
+    check("panel deck code round-trips to the deck's bank ids",
+      JSON.stringify(decodeDeckCode(orderCode)) ===
+      JSON.stringify(printableIds(loadDeck(SQD.store))));
+    check("order panel states bank-questions-only printing",
+      $("order-panel").textContent.indexOf("bank questions only") >= 0);
+    check("order panel states about-2-weeks delivery",
+      $("order-panel").textContent.indexOf("about 2 weeks") >= 0);
+    check("order panel invites entering a code at checkout",
+      $("order-panel").textContent.indexOf("Enter it at checkout") >= 0);
+    check("order panel never prints the actual promo code",
+      document.body.textContent.indexOf("STUDENT" + "10") < 0);
+    check("checkout buttons disabled as coming soon while links are empty",
+      $("order-checkout").textContent.indexOf("coming soon") >= 0 &&
+      $("order-checkout").querySelectorAll("a").length === 0);
+
     // practice screen: add the current question from its own button
     SQD.startPractice({ domain: "Geometry and Trigonometry" });
     var pq = SQD.state.queue[SQD.state.pos];
@@ -574,6 +819,21 @@ function runSelfTest() {
     check("add-from-practice added the card", loadDeck(SQD.store).length === beforePractice + 1 &&
       loadDeck(SQD.store).some(function (e) { return e.kind === "bank" && e.id === pq.id; }));
     check("practice button now shows in-deck state", $("add-current-btn").disabled === true);
+
+    // over-108 deck: pick list renders, default picks are the first 108
+    clearDeck(SQD.store);
+    for (var oi = 0; oi < 110; oi++) addToDeck(SQD.store, { kind: "bank", id: QUESTION_BANK[oi].id });
+    SQD.show("deck"); // panel is still open, so it re-renders for the new deck
+    var pickBoxes = document.querySelectorAll("#order-panel [data-pick]");
+    check("over-108 deck shows a pick list with every bank card", pickBoxes.length === 110);
+    var checkedCount = Array.prototype.filter.call(pickBoxes, function (b) { return b.checked; }).length;
+    check("default picks are the first 108 cards", checkedCount === 108);
+    check("order button caps the count at 108", $("deck-order").textContent.indexOf("108 cards") >= 0);
+    check("capped deck code holds exactly 108 ids",
+      decodeDeckCode($("order-code").value).length === 108);
+    Array.prototype.filter.call(pickBoxes, function (b) { return b.checked; })[0].click();
+    check("unchecking a pick drops the code to 107 ids",
+      decodeDeckCode($("order-code").value).length === 107);
   } catch (err) {
     out.push("FAIL exception: " + (err && err.message));
   }
@@ -595,6 +855,10 @@ if (typeof module !== "undefined" && module.exports) {
     parseNumeric: parseNumeric, checkMC: checkMC, checkGrid: checkGrid,
     answerText: answerText, loadDeck: loadDeck, saveDeck: saveDeck,
     addToDeck: addToDeck, removeFromDeck: removeFromDeck, clearDeck: clearDeck,
-    resolveCard: resolveCard, resolveDeck: resolveDeck
+    resolveCard: resolveCard, resolveDeck: resolveDeck,
+    ORDER_LINKS: ORDER_LINKS, ORDER_TIERS: ORDER_TIERS, ORDER_MAX_CARDS: ORDER_MAX_CARDS,
+    DECK_CODE_PREFIX: DECK_CODE_PREFIX,
+    tierForCount: tierForCount, priceForCount: priceForCount,
+    printableIds: printableIds, encodeDeckCode: encodeDeckCode, decodeDeckCode: decodeDeckCode
   };
 }

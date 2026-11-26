@@ -463,10 +463,33 @@ function runSelfTest() {
   function check(name, cond) { out.push((cond ? "PASS" : "FAIL") + " " + name); }
   function $(id) { return document.getElementById(id); }
   try {
-    check("bank has 100 questions", QUESTION_BANK.length === 100);
+    check("bank has 458 questions", QUESTION_BANK.length === 458);
     var domains = {};
     QUESTION_BANK.forEach(function (q) { domains[q.domain] = true; });
     check("bank spans 8 domains", Object.keys(domains).length === 8);
+    var algebra = QUESTION_BANK.filter(function (q) { return q.domain === "Algebra"; });
+    var algLevels = { 1: 0, 2: 0, 3: 0 };
+    algebra.forEach(function (q) { algLevels[q.level]++; });
+    check("Algebra has 102 questions, 34 per level",
+      algebra.length === 102 && algLevels[1] === 34 && algLevels[2] === 34 && algLevels[3] === 34);
+    var advmath = QUESTION_BANK.filter(function (q) { return q.domain === "Advanced Math"; });
+    var amLevels = { 1: 0, 2: 0, 3: 0 };
+    advmath.forEach(function (q) { amLevels[q.level]++; });
+    check("Advanced Math has 102 questions, 34 per level",
+      advmath.length === 102 && amLevels[1] === 34 && amLevels[2] === 34 && amLevels[3] === 34);
+    var psda = QUESTION_BANK.filter(function (q) { return q.domain === "Problem-Solving and Data Analysis"; });
+    var psdaLevels = { 1: 0, 2: 0, 3: 0 };
+    psda.forEach(function (q) { psdaLevels[q.level]++; });
+    check("PSDA has 102 questions, 34 per level",
+      psda.length === 102 && psdaLevels[1] === 34 && psdaLevels[2] === 34 && psdaLevels[3] === 34);
+    var geometry = QUESTION_BANK.filter(function (q) { return q.domain === "Geometry and Trigonometry"; });
+    var geoLevels = { 1: 0, 2: 0, 3: 0 };
+    geometry.forEach(function (q) { geoLevels[q.level]++; });
+    check("Geometry and Trigonometry has 102 questions, 34 per level",
+      geometry.length === 102 && geoLevels[1] === 34 && geoLevels[2] === 34 && geoLevels[3] === 34);
+    var seenIds = {}, dupId = false;
+    QUESTION_BANK.forEach(function (q) { if (seenIds[q.id]) dupId = true; seenIds[q.id] = true; });
+    check("no duplicate question ids", !dupId);
     check("deck starts empty", loadDeck(SQD.store).length === 0);
 
     // practice: deliberately miss question 1
@@ -522,7 +545,7 @@ function runSelfTest() {
     // browse: add a bank question straight from the bank list
     SQD.show("browse");
     var addBtns = document.querySelectorAll("[data-add]");
-    check("browse lists all 100 bank questions", addBtns.length === 100);
+    check("browse lists all 458 bank questions", addBtns.length === 458);
     var beforeBrowse = loadDeck(SQD.store).length;
     var targetBtn = null, targetId = null;
     Array.prototype.forEach.call(addBtns, function (b) {
